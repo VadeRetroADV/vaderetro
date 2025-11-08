@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, BookOpen, Tag, FileText, Plus, Edit, Trash2, MessageCircle, ArrowLeft, ExternalLink } from 'lucide-react'
+import { Search, BookOpen, Tag, FileText, Plus, Edit, Trash2, MessageCircle, ArrowLeft, ExternalLink, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { buscarConteudoJuridico, buscarPorPalavraChave } from '@/lib/openai'
 
-// Base completa do ordenamento jurídico brasileiro com links oficiais e imagens
+// Base completa do ordenamento jurídico brasileiro com links oficiais e imagens específicas do Unsplash
 const codigosFundamentais = [
   {
     id: 1,
@@ -18,7 +19,8 @@ const codigosFundamentais = [
     lei: "CF/1988",
     url: "https://www.gov.br/planalto/pt-br/conheca-a-presidencia/biblioteca-da-pr/constituicao-federal",
     categoria: "Constitucional",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center",
+    sigla: "cf"
   },
   {
     id: 2,
@@ -26,7 +28,8 @@ const codigosFundamentais = [
     lei: "Lei n. 10.406/2002",
     url: "http://www.planalto.gov.br/ccivil_03/leis/2002/l10406.htm",
     categoria: "Civil",
-    imagem: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop&crop=center",
+    sigla: "cc"
   },
   {
     id: 3,
@@ -34,7 +37,8 @@ const codigosFundamentais = [
     lei: "Lei n. 13.105/2015",
     url: "http://www.planalto.gov.br/ccivil_03/_Ato2015-2018/2015/Lei/L13105.htm",
     categoria: "Processual Civil",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "cpc"
   },
   {
     id: 4,
@@ -42,7 +46,8 @@ const codigosFundamentais = [
     lei: "Decreto-lei n. 2.848/1940",
     url: "http://www.planalto.gov.br/ccivil_03/decreto-lei/Del2848compilado.htm",
     categoria: "Penal",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop&crop=center",
+    sigla: "cp"
   },
   {
     id: 5,
@@ -50,7 +55,8 @@ const codigosFundamentais = [
     lei: "Decreto-lei n. 3.689/1941",
     url: "http://www.planalto.gov.br/ccivil_03/Decreto-Lei/Del3689.htm",
     categoria: "Processual Penal",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "cpp"
   },
   {
     id: 6,
@@ -58,7 +64,8 @@ const codigosFundamentais = [
     lei: "Decreto-lei n. 5.452/1943",
     url: "http://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm",
     categoria: "Trabalhista",
-    imagem: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&h=200&fit=crop&crop=center",
+    sigla: "clt"
   },
   {
     id: 7,
@@ -66,7 +73,8 @@ const codigosFundamentais = [
     lei: "Lei n. 5.172/1966",
     url: "http://www.planalto.gov.br/ccivil_03/Leis/L5172.htm",
     categoria: "Tributário",
-    imagem: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop&crop=center",
+    sigla: "ctn"
   },
   {
     id: 8,
@@ -74,7 +82,8 @@ const codigosFundamentais = [
     lei: "Lei n. 8.078/1990",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l8078.htm",
     categoria: "Consumidor",
-    imagem: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=200&fit=crop&crop=center",
+    sigla: "cdc"
   }
 ]
 
@@ -85,7 +94,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Lei n. 556/1850",
     url: "http://www.planalto.gov.br/CCIVIL_03///LEIS/LIM/LIM556.htm",
     categoria: "Comercial",
-    imagem: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=200&fit=crop&crop=center",
+    sigla: "ccom"
   },
   {
     id: 10,
@@ -93,7 +103,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Lei n. 9.503/1997",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l9503compilado.htm",
     categoria: "Trânsito",
-    imagem: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=200&fit=crop&crop=center",
+    sigla: "ctb"
   },
   {
     id: 11,
@@ -101,7 +112,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Lei n. 12.651/2012",
     url: "http://www.planalto.gov.br/ccivil_03/_ato2011-2014/2012/lei/l12651.htm",
     categoria: "Ambiental",
-    imagem: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop&crop=center",
+    sigla: "cf-ambiental"
   },
   {
     id: 12,
@@ -109,7 +121,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Lei n. 4.737/1965",
     url: "http://www.planalto.gov.br/ccivil_03/leis/L4737.htm",
     categoria: "Eleitoral",
-    imagem: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=400&h=200&fit=crop&crop=center",
+    sigla: "ce"
   },
   {
     id: 13,
@@ -117,7 +130,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Decreto-Lei n. 1.002/1969",
     url: "http://www.planalto.gov.br/ccivil_03/decreto-lei/del1002.htm",
     categoria: "Militar",
-    imagem: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop&crop=center",
+    sigla: "cppm"
   },
   {
     id: 14,
@@ -125,7 +139,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Decreto-Lei n. 4.657/1942",
     url: "http://www.planalto.gov.br/ccivil_03/decreto-lei/del4657compilado.htm",
     categoria: "Geral",
-    imagem: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop&crop=center",
+    sigla: "lindb"
   },
   {
     id: 15,
@@ -133,7 +148,8 @@ const legislacaoCivilComercialPenal = [
     lei: "Lei n. 7.210/1984",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l7210.htm",
     categoria: "Penal",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center",
+    sigla: "lep"
   }
 ]
 
@@ -144,7 +160,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 8.069/1990",
     url: "http://www.planalto.gov.br/ccivil_03/leis/L8069.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=200&fit=crop&crop=center",
+    sigla: "eca"
   },
   {
     id: 17,
@@ -152,7 +169,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 8.906/1994",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l8906.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "eoab"
   },
   {
     id: 18,
@@ -160,7 +178,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 10.257/2001",
     url: "http://www.planalto.gov.br/ccivil_03/leis/leis_2001/l10257.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=200&fit=crop&crop=center",
+    sigla: "ec"
   },
   {
     id: 19,
@@ -168,7 +187,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 10.741/2003",
     url: "http://www.planalto.gov.br/ccivil_03/leis/2003/l10.741.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop&crop=center",
+    sigla: "epi"
   },
   {
     id: 20,
@@ -176,7 +196,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 10.826/2003",
     url: "http://www.planalto.gov.br/ccivil_03/leis/2003/l10.826.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=200&fit=crop&crop=center",
+    sigla: "ed"
   },
   {
     id: 21,
@@ -184,7 +205,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 13.146/2015",
     url: "http://www.planalto.gov.br/Ccivil_03/_Ato2015-2018/2015/Lei/L13146.htm",
     categoria: "Estatuto",
-    imagem: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=200&fit=crop&crop=center",
+    sigla: "epd"
   },
   {
     id: 22,
@@ -192,7 +214,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 11.340/2006",
     url: "http://www.planalto.gov.br/ccivil_03/_ato2004-2006/2006/lei/l11340.htm",
     categoria: "Proteção",
-    imagem: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=200&fit=crop&crop=center",
+    sigla: "lmp"
   },
   {
     id: 23,
@@ -200,7 +223,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 8.429/1992",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l8429.htm",
     categoria: "Administrativa",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "lia"
   },
   {
     id: 24,
@@ -208,7 +232,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 7.347/1985",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l7347.htm",
     categoria: "Processual",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "lacp"
   },
   {
     id: 25,
@@ -216,7 +241,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 11.343/2006",
     url: "http://www.planalto.gov.br/ccivil_03/_ato2004-2006/2006/lei/l11343.htm",
     categoria: "Penal",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center",
+    sigla: "lad"
   },
   {
     id: 26,
@@ -224,7 +250,8 @@ const estatutosLeisEspecificas = [
     lei: "Lei n. 12.016/2009",
     url: "https://www.planalto.gov.br/ccivil_03/_ato2007-2010/2009/lei/l12016.htm",
     categoria: "Processual",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "lms"
   }
 ]
 
@@ -235,7 +262,8 @@ const leisAdministrativasProcessuais = [
     lei: "Lei n. 14.133/2021",
     url: "http://www.planalto.gov.br/ccivil_03/_ato2019-2022/2021/lei/l14133.htm",
     categoria: "Administrativa",
-    imagem: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=200&fit=crop&crop=center",
+    sigla: "nllc"
   },
   {
     id: 28,
@@ -243,7 +271,8 @@ const leisAdministrativasProcessuais = [
     lei: "Lei Complementar n. 101/2000",
     url: "http://www.planalto.gov.br/ccivil_03/leis/lcp/lcp101.htm",
     categoria: "Fiscal",
-    imagem: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop&crop=center",
+    sigla: "lrf"
   },
   {
     id: 29,
@@ -251,7 +280,8 @@ const leisAdministrativasProcessuais = [
     lei: "Lei n. 9.099/1995",
     url: "http://www.planalto.gov.br/ccivil_03/leis/l9099.htm",
     categoria: "Processual",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "jecc"
   },
   {
     id: 30,
@@ -259,7 +289,8 @@ const leisAdministrativasProcessuais = [
     lei: "Lei n. 10.259/2001",
     url: "https://www.planalto.gov.br/ccivil_03/leis/leis_2001/l10259.htm",
     categoria: "Processual",
-    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589994965851-a8f479c573a9?w=400&h=200&fit=crop&crop=center",
+    sigla: "jef"
   }
 ]
 
@@ -270,7 +301,8 @@ const linksJurisprudencia = [
     lei: "Supremo Tribunal Federal",
     url: "https://portal.stf.jus.br/textos/verTexto.asp?servico=jurisprudenciaSumula",
     categoria: "Jurisprudência",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center",
+    sigla: "stf"
   },
   {
     id: 32,
@@ -278,7 +310,8 @@ const linksJurisprudencia = [
     lei: "Superior Tribunal de Justiça",
     url: "https://scon.stj.jus.br/SCON/sumanot/",
     categoria: "Jurisprudência",
-    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=200&fit=crop&crop=center",
+    sigla: "stj"
   },
   {
     id: 33,
@@ -286,26 +319,41 @@ const linksJurisprudencia = [
     lei: "Tribunal Superior do Trabalho",
     url: "https://www.tst.jus.br/sumulas-e-orientacoes-jurisprudenciais",
     categoria: "Jurisprudência",
-    imagem: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&h=200&fit=crop&crop=center"
+    imagem: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&h=200&fit=crop&crop=center",
+    sigla: "tst"
   }
 ]
 
-// Mapeamento para busca avançada por código
-const codigoMap: { [key: string]: any } = {
-  'cf': { nome: 'Constituição Federal', url: codigosFundamentais[0].url },
-  'constituicao': { nome: 'Constituição Federal', url: codigosFundamentais[0].url },
-  'cc': { nome: 'Código Civil', url: codigosFundamentais[1].url },
-  'codigo civil': { nome: 'Código Civil', url: codigosFundamentais[1].url },
-  'cpc': { nome: 'Código de Processo Civil', url: codigosFundamentais[2].url },
-  'cp': { nome: 'Código Penal', url: codigosFundamentais[3].url },
-  'codigo penal': { nome: 'Código Penal', url: codigosFundamentais[3].url },
-  'cpp': { nome: 'Código de Processo Penal', url: codigosFundamentais[4].url },
-  'clt': { nome: 'CLT', url: codigosFundamentais[5].url },
-  'ctn': { nome: 'Código Tributário Nacional', url: codigosFundamentais[6].url },
-  'cdc': { nome: 'Código de Defesa do Consumidor', url: codigosFundamentais[7].url },
-  'ctb': { nome: 'Código de Trânsito Brasileiro', url: legislacaoCivilComercialPenal[1].url },
-  'eca': { nome: 'Estatuto da Criança e do Adolescente', url: estatutosLeisEspecificas[0].url }
-}
+// Mapeamento completo para busca avançada por código
+const codigoMap: { [key: string]: any } = {}
+
+// Adicionar todos os códigos ao mapeamento
+const todosOsCodigos = [
+  ...codigosFundamentais,
+  ...legislacaoCivilComercialPenal,
+  ...estatutosLeisEspecificas,
+  ...leisAdministrativasProcessuais,
+  ...linksJurisprudencia
+]
+
+todosOsCodigos.forEach(codigo => {
+  codigoMap[codigo.sigla] = { 
+    nome: codigo.nome, 
+    url: codigo.url,
+    lei: codigo.lei 
+  }
+  // Adicionar variações comuns
+  if (codigo.sigla === 'cf') {
+    codigoMap['constituicao'] = codigoMap[codigo.sigla]
+    codigoMap['constituicao federal'] = codigoMap[codigo.sigla]
+  }
+  if (codigo.sigla === 'cc') {
+    codigoMap['codigo civil'] = codigoMap[codigo.sigla]
+  }
+  if (codigo.sigla === 'cp') {
+    codigoMap['codigo penal'] = codigoMap[codigo.sigla]
+  }
+})
 
 interface Etiqueta {
   id: number
@@ -319,9 +367,13 @@ interface Etiqueta {
 export default function VadeRetro() {
   const [abaAtiva, setAbaAtiva] = useState('codigos')
   const [termoBusca, setTermoBusca] = useState('')
+  const [termoBuscaPalavra, setTermoBuscaPalavra] = useState('')
   const [resultadoBuscaAvancada, setResultadoBuscaAvancada] = useState<any>(null)
+  const [resultadoBuscaPalavra, setResultadoBuscaPalavra] = useState<any>(null)
   const [codigoSelecionado, setCodigoSelecionado] = useState<any>(null)
   const [carregandoConteudo, setCarregandoConteudo] = useState(false)
+  const [carregandoBusca, setCarregandoBusca] = useState(false)
+  const [carregandoPalavra, setCarregandoPalavra] = useState(false)
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([
     {
       id: 1,
@@ -357,41 +409,86 @@ export default function VadeRetro() {
   const voltarParaCodigos = () => {
     setCodigoSelecionado(null)
     setResultadoBuscaAvancada(null)
+    setResultadoBuscaPalavra(null)
   }
 
-  const buscarArtigoEspecifico = (termo: string) => {
+  const buscarArtigoEspecifico = async (termo: string) => {
+    if (!termo.trim()) return
+    
+    setCarregandoBusca(true)
+    
     // Formato: codigo,artigo (ex: cc,105)
     if (termo.includes(',')) {
       const [codigo, artigo] = termo.split(',').map(s => s.trim().toLowerCase())
       
       if (codigoMap[codigo]) {
+        try {
+          const resultado = await buscarConteudoJuridico(codigoMap[codigo].nome, artigo)
+          
+          setResultadoBuscaAvancada({
+            tipo: 'artigo_especifico',
+            codigo: codigoMap[codigo].nome,
+            artigo: artigo,
+            url: codigoMap[codigo].url,
+            lei: codigoMap[codigo].lei,
+            mensagem: `Artigo ${artigo} do ${codigoMap[codigo].nome}`,
+            conteudo: resultado.conteudo,
+            fonte: resultado.fonte,
+            sucesso: resultado.success
+          })
+        } catch (error) {
+          setResultadoBuscaAvancada({
+            tipo: 'erro',
+            mensagem: 'Erro ao buscar artigo',
+            conteudo: 'Erro ao conectar com a API. Verifique sua chave OpenAI e tente novamente.',
+            sucesso: false
+          })
+        }
+      } else {
         setResultadoBuscaAvancada({
-          tipo: 'artigo_especifico',
-          codigo: codigoMap[codigo].nome,
-          artigo: artigo,
-          url: codigoMap[codigo].url,
-          mensagem: `Artigo ${artigo} do ${codigoMap[codigo].nome}`,
-          conteudoSimulado: `
-ARTIGO ${artigo.toUpperCase()}
-
-Este é o conteúdo simulado do artigo ${artigo} do ${codigoMap[codigo].nome}.
-
-Em uma implementação real, este conteúdo seria obtido através de:
-1. API do governo brasileiro
-2. Base de dados local com todo o conteúdo jurídico
-3. Web scraping dos sites oficiais do Planalto
-
-O artigo ${artigo} trata de questões específicas relacionadas à legislação em questão, 
-fornecendo diretrizes claras para aplicação prática no ordenamento jurídico brasileiro.
-
-Para ver o conteúdo oficial completo, acesse o link do Planalto disponível abaixo.
-          `
+          tipo: 'erro',
+          mensagem: 'Código não encontrado',
+          conteudo: `O código "${codigo}" não foi encontrado. Verifique a lista de códigos disponíveis.`,
+          sucesso: false
         })
-        return
       }
+    } else {
+      setResultadoBuscaAvancada({
+        tipo: 'erro',
+        mensagem: 'Formato inválido',
+        conteudo: 'Use o formato: código,artigo (exemplo: cc,105)',
+        sucesso: false
+      })
     }
     
-    setResultadoBuscaAvancada(null)
+    setCarregandoBusca(false)
+  }
+
+  const buscarPorPalavraChave = async (palavra: string) => {
+    if (!palavra.trim()) return
+    
+    setCarregandoPalavra(true)
+    
+    try {
+      const resultado = await buscarPorPalavraChave(palavra)
+      
+      setResultadoBuscaPalavra({
+        tipo: 'busca_palavra',
+        termo: palavra,
+        conteudo: resultado.conteudo,
+        fonte: resultado.fonte,
+        sucesso: resultado.success
+      })
+    } catch (error) {
+      setResultadoBuscaPalavra({
+        tipo: 'erro',
+        termo: palavra,
+        conteudo: 'Erro ao conectar com a API. Verifique sua chave OpenAI e tente novamente.',
+        sucesso: false
+      })
+    }
+    
+    setCarregandoPalavra(false)
   }
 
   const criarEtiqueta = () => {
@@ -862,10 +959,12 @@ Para ver o conteúdo oficial completo, acesse o link do Planalto disponível aba
           <div className="space-y-4 sm:space-y-6">
             <div className="text-center">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Busca Avançada</h2>
-              <p className="text-sm sm:text-base text-gray-600">Encontre artigos específicos usando o formato: código,artigo</p>
+              <p className="text-sm sm:text-base text-gray-600">Encontre artigos específicos ou busque por palavras-chave</p>
             </div>
 
+            {/* Busca por Artigo Específico */}
             <div className="max-w-2xl mx-auto">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Busca por Artigo Específico</h3>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <div className="flex-1">
                   <Input
@@ -879,13 +978,47 @@ Para ver o conteúdo oficial completo, acesse o link do Planalto disponível aba
                 <Button 
                   onClick={() => buscarArtigoEspecifico(termoBusca)}
                   className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                  disabled={carregandoBusca}
                 >
-                  <Search className="h-4 w-4 mr-2" />
-                  Buscar
+                  {carregandoBusca ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4 mr-2" />
+                  )}
+                  Buscar Artigo
                 </Button>
               </div>
             </div>
 
+            {/* Busca por Palavra-chave */}
+            <div className="max-w-2xl mx-auto">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Busca por Palavra-chave</h3>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    placeholder="Digite uma palavra-chave (ex: casamento, herança, direitos fundamentais)"
+                    value={termoBuscaPalavra}
+                    onChange={(e) => setTermoBuscaPalavra(e.target.value)}
+                    className="text-base sm:text-lg"
+                  />
+                </div>
+                <Button 
+                  onClick={() => buscarPorPalavraChave(termoBuscaPalavra)}
+                  className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                  disabled={carregandoPalavra}
+                >
+                  {carregandoPalavra ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4 mr-2" />
+                  )}
+                  Buscar Tema
+                </Button>
+              </div>
+            </div>
+
+            {/* Resultado da Busca por Artigo */}
             {resultadoBuscaAvancada && (
               <div className="max-w-4xl mx-auto">
                 <div className="flex flex-col sm:flex-row sm:items-center mb-4 space-y-2 sm:space-y-0">
@@ -907,35 +1040,41 @@ Para ver o conteúdo oficial completo, acesse o link do Planalto disponível aba
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                       <div>
                         <CardTitle className="text-base sm:text-lg">{resultadoBuscaAvancada.mensagem}</CardTitle>
-                        <Badge variant="secondary" className="mt-1">Busca Específica</Badge>
+                        <Badge variant={resultadoBuscaAvancada.sucesso ? "secondary" : "destructive"} className="mt-1">
+                          {resultadoBuscaAvancada.sucesso ? "OpenAI GPT-4" : "Erro"}
+                        </Badge>
                       </div>
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={criarEtiquetaDaBusca}
-                          className="w-full sm:w-auto"
-                        >
-                          <Tag className="h-4 w-4 mr-1" />
-                          Criar Etiqueta
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(resultadoBuscaAvancada.url, '_blank')}
-                          className="w-full sm:w-auto"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Ver no Planalto
-                        </Button>
-                      </div>
+                      {resultadoBuscaAvancada.sucesso && (
+                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={criarEtiquetaDaBusca}
+                            className="w-full sm:w-auto"
+                          >
+                            <Tag className="h-4 w-4 mr-1" />
+                            Criar Etiqueta
+                          </Button>
+                          {resultadoBuscaAvancada.url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(resultadoBuscaAvancada.url, '_blank')}
+                              className="w-full sm:w-auto"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Ver no Planalto
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4">
                     <div className="bg-white border rounded-lg p-3 sm:p-6">
                       <div className="prose max-w-none">
                         <pre className="whitespace-pre-wrap text-xs sm:text-sm text-gray-700 font-mono bg-gray-50 p-3 sm:p-4 rounded border overflow-x-auto">
-                          {resultadoBuscaAvancada.conteudoSimulado}
+                          {resultadoBuscaAvancada.conteudo}
                         </pre>
                       </div>
                     </div>
@@ -944,33 +1083,85 @@ Para ver o conteúdo oficial completo, acesse o link do Planalto disponível aba
               </div>
             )}
 
-            {!resultadoBuscaAvancada && (
+            {/* Resultado da Busca por Palavra-chave */}
+            {resultadoBuscaPalavra && (
+              <div className="max-w-4xl mx-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center mb-4 space-y-2 sm:space-y-0">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setResultadoBuscaPalavra(null)}
+                    className="mr-0 sm:mr-4 w-full sm:w-auto"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Nova Busca
+                  </Button>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 text-center sm:text-left">
+                    Resultados para: "{resultadoBuscaPalavra.termo}"
+                  </h3>
+                </div>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+                      <div>
+                        <CardTitle className="text-base sm:text-lg">Busca por Palavra-chave</CardTitle>
+                        <Badge variant={resultadoBuscaPalavra.sucesso ? "secondary" : "destructive"} className="mt-1">
+                          {resultadoBuscaPalavra.sucesso ? "OpenAI GPT-4" : "Erro"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="bg-white border rounded-lg p-3 sm:p-6">
+                      <div className="prose max-w-none">
+                        <div className="text-sm sm:text-base text-gray-700 leading-relaxed">
+                          {resultadoBuscaPalavra.conteudo.split('\n').map((linha: string, index: number) => (
+                            <p key={index} className="mb-2">
+                              {linha}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {!resultadoBuscaAvancada && !resultadoBuscaPalavra && (
               <div className="bg-blue-50 p-4 sm:p-6 rounded-lg max-w-2xl mx-auto">
                 <h4 className="font-semibold text-blue-900 mb-3">Como usar a busca avançada:</h4>
-                <div className="space-y-2 text-sm text-blue-800">
-                  <p><strong>Formato:</strong> código,artigo</p>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-2 mt-3">
-                    <div>
-                      <p className="font-medium">Códigos disponíveis:</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <strong>cf</strong> ou <strong>constituicao</strong> - Constituição Federal</li>
-                        <li>• <strong>cc</strong> ou <strong>codigo civil</strong> - Código Civil</li>
-                        <li>• <strong>cpc</strong> - Código de Processo Civil</li>
-                        <li>• <strong>cp</strong> ou <strong>codigo penal</strong> - Código Penal</li>
-                        <li>• <strong>cpp</strong> - Código de Processo Penal</li>
-                        <li>• <strong>clt</strong> - Consolidação das Leis do Trabalho</li>
-                      </ul>
+                <div className="space-y-4 text-sm text-blue-800">
+                  <div>
+                    <p className="font-medium mb-2">1. Busca por Artigo Específico:</p>
+                    <p><strong>Formato:</strong> código,artigo</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-2 mt-2">
+                      <div>
+                        <p className="font-medium">Códigos disponíveis:</p>
+                        <ul className="text-xs space-y-1 mt-1">
+                          <li>• <strong>cf</strong> - Constituição Federal</li>
+                          <li>• <strong>cc</strong> - Código Civil</li>
+                          <li>• <strong>cpc</strong> - Código de Processo Civil</li>
+                          <li>• <strong>cp</strong> - Código Penal</li>
+                          <li>• <strong>clt</strong> - CLT</li>
+                          <li>• <strong>cdc</strong> - Código de Defesa do Consumidor</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="font-medium">Exemplos:</p>
+                        <ul className="text-xs space-y-1 mt-1">
+                          <li>• <strong>cc,105</strong> - Art. 105 do Código Civil</li>
+                          <li>• <strong>cf,5</strong> - Art. 5º da Constituição</li>
+                          <li>• <strong>clt,7</strong> - Art. 7º da CLT</li>
+                        </ul>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Exemplos de uso:</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <strong>cc,105</strong> - Artigo 105 do Código Civil</li>
-                        <li>• <strong>cf,5</strong> - Artigo 5º da Constituição</li>
-                        <li>• <strong>clt,7</strong> - Artigo 7º da CLT</li>
-                        <li>• <strong>cdc,6</strong> - Artigo 6º do CDC</li>
-                        <li>• <strong>eca,4</strong> - Artigo 4º do ECA</li>
-                      </ul>
-                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="font-medium mb-2">2. Busca por Palavra-chave:</p>
+                    <p>Digite qualquer termo jurídico e a IA encontrará os artigos relevantes.</p>
+                    <p className="text-xs mt-1">Exemplos: "casamento", "herança", "direitos fundamentais", "contrato de trabalho"</p>
                   </div>
                 </div>
               </div>
